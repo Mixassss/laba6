@@ -1,138 +1,78 @@
 #include <iostream>
+#include <vector>
 #include <chrono>
 #include <thread>
-#include <random>
-
+ 
 using namespace std;
-
-// Размеры поля с учётом границ
-const int width = 10;
-const int height = 10;
-
-// Функция для очистки экрана 
-static void clear_screen() {
-    cout << "\033[2J\033[1;1H";  // ANSI escape код для очистки экрана
-}
-
-// Функция для отображения текущего состояния поля
-void display_field(int** field) {
-    clear_screen(); // Очищаем экран перед выводом нового состояния поля
-    // Перебираем все клетки поля и выводим их состояние
-    for (int i = 0; i < height; ++i) {
-        for (int j = 0; j < width; ++j) {
-            if (i == 0 || i == height - 1 || j == 0 || j == width - 1)
-                cout << "*";  // Границы поля
-            else if (field[i][j] == 1)
-                cout << "#";  // Если клетка живая, выводим символ #
-            else
-                cout << " ";  // Если клетка мертвая, выводим пробел
+ 
+// Размеры игрового поля
+const int WIDTH = 50;
+const int HEIGHT = 20;
+ 
+// Символы для отображения живых и мертвых клеток
+const char ALIVE_CELL = &apos;*&apos;;
+const char DEAD_CELL = &apos;.&apos;;
+ 
+// Задержка между кадрами (в миллисекундах)
+const int FRAME_DELAY = 100;
+ 
+// Функция для отрисовки текущего состояния игрового поля
+void draw(const vector<vector<bool>>& grid) {
+    system("cls"); // Очистка консоли
+    for (int y = 0; y < HEIGHT; ++y) {
+        for (int x = 0; x < WIDTH; ++x) {
+            cout << (grid[y][x] ? ALIVE_CELL : DEAD_CELL); // Если true - живая кл, false - мертвая
         }
-        cout << endl; // Переходим на новую строку после вывода строки клеток
+        cout << endl;
     }
 }
-
-// Функция для вычисления следующего поколения
-void next_generation(int**& field) {
-    int** next_field = new int* [height]; // Создаём новое поле для следующего поколения
-    for (int i = 0; i < height; ++i) {
-        next_field[i] = new int[width]; // Выделяем память под каждую строку нового поля
-    }
-
-    // Перебираем каждую клетку текущего поколения и вычисляем её состояние в следующем поколении
-    for (int i = 1; i < height - 1; ++i) { // не учитываем границы
-        for (int j = 1; j < width - 1; ++j) {
-            int neighbors = 0;
-            // Подсчитываем количество соседей для каждой клетки
-            for (int ni = -1; ni <= 1; ++ni) { 
-                for (int nj = -1; nj <= 1; ++nj) {
-                    if (ni == 0 && nj == 0) //проверка на текущую клетку
-                        continue;  // Пропускаем текущую клетку
-                    neighbors += field[i + ni][j + nj]; // Увеличиваем счётчик соседей для живых клеток
+ 
+// Функция для обновления состояния игрового поля на один шаг
+void update(vector<vector<bool>>& grid) {
+    vector<vector<bool>> newGrid = grid;
+    // Применяем правила клеточного автомата
+    for (int y = 0; y < HEIGHT; ++y) {
+        for (int x = 0; x < WIDTH; ++x) {
+            // Считаем количество живых соседей
+            int aliveNeighbors = 0;
+            for (int dy = -1; dy <= 1; ++dy) {
+                for (int dx = -1; dx <= 1; ++dx) {
+                    if (dx == 0 && dy == 0) continue; // Пропускаем текущую клетку
+                    int ny = (y + dy + HEIGHT) % HEIGHT;
+                    int nx = (x + dx + WIDTH) % WIDTH;
+                    if (grid[ny][nx]) aliveNeighbors++;
                 }
             }
-            // Применяем правила клеточного автомата "Жизнь"
-            if (field[i][j] == 1) {
-                if (neighbors < 2 || neighbors > 3) // если у живой клетки соседей меньше 2 или больше 3 она станоится мертвой
-                    next_field[i][j] = 0;  // Смерть из-за перенаселённости или одиночества
-                else
-                    next_field[i][j] = 1;  // Выживание
-            }else { // если у мертвой клетки  соседей 3,то она рождается,в другом случает остается мертвой
-                if (neighbors == 3)
-                    next_field[i][j] = 1;  // Рождение новой клетки
-                else
-                    next_field[i][j] = 0;  // Клетка остаётся мёртвой
+            // Применяем правила
+            if (grid[y][x]) {
+                if (aliveNeighbors < 2 || aliveNeighbors > 3) newGrid[y][x] = false; // Умирает от одиночества или перенаселения
+            } else {
+                if (aliveNeighbors == 3) newGrid[y][x] = true; // Воскрешается от трех соседей
             }
         }
     }
-
-    // Удаление старого поля
-    for (int i = 0; i < height; ++i) {
-        delete[] field[i]; // оочищаем  память для каждой строки
-    }
-    delete[] field; // очищаем память массива указателей на строки
-
-    // Передача указателя на новое поле
-    field = next_field;
+    grid = newGrid;
 }
-
-// Функция для инициализации поля случайными значениями
-int** initialize_field() {
-    int** field = new int* [height]; // Создание двумерного массива указателей для строк поля
-    for (int i = 0; i < height; ++i) {
-        field[i] = new int[width]; // Выделение памяти под каждую строку поля
-    }
-
-    // Заполнение поля нулями (все клетки мертвы)
-    for (int i = 0; i < height; ++i) {
-        for (int j = 0; j < width; ++j) {
-            field[i][j] = 0; // Установка значения 0 (мертвая клетка) для каждой клетки поля
-        }
-    }
-
-    return field; // Возвращаем указатель на инициализированное поле
-}
-
-// Функция для инициализации поля с шаблонами
-void initialize_field_with_patterns(int** field) {
-    // Очистка поля перед установкой планера
-    for (int i = 0; i < height; ++i) {
-        for (int j = 0; j < width; ++j) {
-            field[i][j] = 0; // Установка всех клеток в начальное состояние (мертвые)
-        }
-    }
-
-    // Установка планера на поле
-    field[2][3] = field[3][4] = field[4][2] = field[4][3] = field[4][4] = 1;  // Планер
-}
-
+ 
 int main() {
-    // Инициализация поля
-    int** field = initialize_field();
-
-    // Инициализация с определенными шаблонами 
-    initialize_field_with_patterns(field);
-
-    int generation_count = 0; // Счётчик поколений
-
-    // Анимация
-    for (int generation = 0; generation < 100; ++generation) {
-        display_field(field);
-        if (generation_count == 13) {
-            initialize_field_with_patterns(field); // Обновляем планер
-            generation_count = 0; // Сбрасываем счётчик поколений
-        }
-        else {
-            next_generation(field); // Вычисляем следующее поколение
-            generation_count++; // Увеличиваем счётчик поколений
-        }
-        this_thread::sleep_for(chrono::milliseconds(100)); // Задержка в миллисекундах
+    srand(time(0));
+ 
+    // Инициализация игрового поля
+    vector<vector<bool>> grid(HEIGHT, vector<bool>(WIDTH, false));
+ 
+    // Пример «паровоза»
+    grid[5][5] = true;
+    grid[5][6] = true;
+    grid[5][7] = true;
+    grid[4][7] = true;
+    grid[3][6] = true;
+ 
+    // Основной цикл игры
+    while (true) {
+        draw(grid);
+        update(grid);
+        this_thread::sleep_for(chrono::milliseconds(FRAME_DELAY)); // Задержка между кадрами
     }
-
-    // Освобождение памяти
-    for (int i = 0; i < height; ++i) {
-        delete[] field[i];
-    }
-    delete[] field;
-
+ 
     return 0;
 }
