@@ -168,7 +168,7 @@ double* backwardSubstitution(double** U, double* y, int n) { // Решаем Ux 
 
 int main() {
     setlocale(LC_ALL, "ru");
-    double M = -1.21, N = 0.2, P = 0.88; // переменные по варианту
+    double M = -0.88, N = 0.1, P = 0.91; // переменные по варианту
     double epsilon = 0.001; // точность
     int maxIterations = 1000; // макс. кол-во итераций
 
